@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Pose_landmarks {
+  id         Int    @id @default(autoincrement())
+  x          Float? @default(0) @db.Float
+  y          Float? @default(0) @db.Float
+  z          Float? @default(0) @db.Float
+  visibility Float? @default(0) @db.Float
+  timesteamp Int?   @default(0)
+}
+
+model pose_landmarks {
+  doc         Json?
+  id          Bytes @id @map("_id") @db.VarBinary(32)
+  json_schema Json? @map("_json_schema")
+}
+
+model users {
+  uuid                   String   @id @db.VarChar(100)
+  account_source_type    String   @db.VarChar(45)
+  account_source_id      String   @db.VarChar(100)
+  account_source_email   String   @db.VarChar(200)
+  account_source_name    String   @db.VarChar(100)
+  account_source_picture String   @db.VarChar(200)
+  created_at             DateTime @default(now()) @db.Timestamp(0)
+  updated_at             DateTime @default(now()) @db.Timestamp(0)
+
+  @@unique([account_source_type, account_source_id], map: "account_source_unique")
+}
+
+model record_user_login_history {
+  doc         Json?
+  id          Bytes @id @map("_id") @db.VarBinary(32)
+  json_schema Json? @map("_json_schema")
+}
+
+model user_login_history {
+  doc         Json?
+  id          Bytes @id @map("_id") @db.VarBinary(32)
+  json_schema Json? @map("_json_schema")
+}

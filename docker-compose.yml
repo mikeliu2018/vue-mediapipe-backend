@@ -1,0 +1,72 @@
+version: "3.8"
+services:
+  mongo6:
+    image: mongo:6.0
+    container_name: mongo6    
+    command: mongod --dbpath /data/db --port 27041 --config /resource/mongod.yml
+    networks:
+      - default
+      - app_net  
+    ports:
+      - 27041:27041      
+    volumes:
+      - ./docker/mongo/config/mongod.yml:/resource/mongod.yml
+      - ./docker/mongo/standalone/data:/data/db
+
+  mysql:
+    image: 'mysql:8.0'
+    container_name: mysql    
+    ports:
+      - '${MYSQL_PORT:-3306}:3306'
+      - 33060:33060
+    environment:
+      MYSQL_ROOT_PASSWORD: '${MYSQL_ROOT_PASSWORD}'
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: '${MYSQL_DATABASE}'
+      MYSQL_USER: '${MYSQL_USER}'
+      MYSQL_PASSWORD: '${MYSQL_PASSWORD}'
+      # MYSQL_ALLOW_EMPTY_PASSWORD: 1
+    volumes:
+        - 'vue-mediapipe-backend-mysql:/var/lib/mysql'
+    networks:
+        - default
+        - app_net
+    # healthcheck:
+    #     test: ["CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}"]
+    #     retries: 3
+    #     timeout: 5s          
+      
+  vue-mediapipe-backend:
+    build:
+      context: ./
+      dockerfile: ./docker/vue-mediapipe-backend/Dockerfile
+    container_name: vue-mediapipe-backend
+    depends_on:
+      - mongo6
+      - mysql
+    entrypoint:      
+      - /usr/src/app/docker/vue-mediapipe-backend/run.sh    
+    image: tomatox/vue-mediapipe-backend    
+    ports:
+      - 3000:3000
+    # user: 1000:1000    
+    volumes:
+      - .:/usr/src/app      
+    networks:
+      - default
+      - app_net  
+    # restart: unless-stopped
+    # working_dir: '/var/www/html'    
+    # tty: true
+
+volumes:
+  vue-mediapipe-backend-mysql: 
+    driver: local
+
+networks:
+  default:
+    driver: bridge    
+  app_net:
+    external: true
+  # sail:
+  #   driver: bridge
