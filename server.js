@@ -9,6 +9,7 @@ const exampleMongo = require('./examples/mongo');
 const exampleMysql = require('./examples/mysql');
 const exampleMysqlX = require('./examples/mysqlx');
 const { PrismaClient } = require('@prisma/client');
+const mysqlx = require('@mysql/xdevapi');
 const { getUser, LoginWithGoogle, UserLoginHistory } = require('./modules/user');
 const { verify } = require('crypto');
 
@@ -26,13 +27,26 @@ process.on('uncaughtException', err => {
 app.use(express.static('public'));
 app.use(express.json());
 
+const mysqlxConfig = {
+  schema: process.env.MYSQL_DATABASE,
+  password: process.env.MYSQL_PASSWORD,
+  user: process.env.MYSQL_USER,
+  host: process.env.MYSQL_HOST,
+  port: parseInt(process.env.MYSQL_X_PORT),
+};
+
 app.post('/login-with-google', async function (req, res) {  
 
+  const prisma = new PrismaClient();
+  const session = await mysqlx.getSession(mysqlxConfig);
+  console.log('mysqlxConfig', mysqlxConfig);
+  console.log('session', session);
+  
   try {
-    const user = await LoginWithGoogle(req, res);
+    const user = await LoginWithGoogle(prisma, req);
     console.log('loginWithGoogle result', user);
     
-    const userLoginHistory = await UserLoginHistory(user);
+    const userLoginHistory = await UserLoginHistory(session, user);
     console.log('userLoginHistory', userLoginHistory);
 
     res.send({ result: 'OK', message: 'login successfully' });
@@ -40,29 +54,17 @@ app.post('/login-with-google', async function (req, res) {
   } catch (err) {
     console.error(err);
     res.send({ result: 'error', message: err.message });
+  } finally {
+    prisma.$disconnect();
+    session.close();
   }  
   
 });
 
-app.post('/login', function (req, res) {
-  //
-  // "Log in" user and set userId to session.
-  //
-  const id = uuid.v4();
-  // console.log(req.session);
-  console.log(`Updating session for user ${id}`);  
-  res.send({ result: 'OK', message: 'Session updated' });
-});
-
 app.delete('/logout', function (request, response) {
   const ws = map.get(request.session.userId);
-
-  console.log('Destroying session');
-  request.session.destroy(function () {
-    if (ws) ws.close();
-
-    response.send({ result: 'OK', message: 'Session destroyed' });
-  });
+  if (ws) ws.close();
+  response.send({ result: 'OK', message: 'logout successfully' });  
 });
 
 //
@@ -76,24 +78,6 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ clientTracking: false, noServer: true });
 
 server.on('upgrade', function (request, socket, head) {
-  // console.log('Parsing session from request...');  
-
-  // sessionParser(request, {}, () => {
-  //   console.log(request.session);
-  //   console.log("request.session.userId", request.session.userId);
-
-  //   if (!request.session.userId) {
-  //     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-  //     socket.destroy();
-  //     return;
-  //   }
-
-  //   console.log('Session is parsed!');
-
-  //   wss.handleUpgrade(request, socket, head, function (ws) {
-  //     wss.emit('connection', ws, request);
-  //   });
-  // });
 
   console.log('Authenticate session from request...');
 
@@ -115,9 +99,16 @@ server.on('upgrade', function (request, socket, head) {
       const account_source_id = claims['sub'];
       const prisma = new PrismaClient();
 
-      let user = await getUser(prisma, account_source_type, account_source_id);      
-      console.log(user);
-      err = (user === null);
+      try {
+        let user = await getUser(prisma, account_source_type, account_source_id);              
+        console.log(user);
+        err = (user === null);
+      } catch (error) {        
+        console.log(error);
+      } finally {
+        prisma.$disconnect();
+      }
+
     }
       
     cb(err, request.client);

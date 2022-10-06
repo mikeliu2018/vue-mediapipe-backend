@@ -38,7 +38,7 @@ async function verifyIdToken(idToken, clientId) {
 
 module.exports.getUser = getUser;
 
-module.exports.LoginWithGoogle = async (req, res) => {
+module.exports.LoginWithGoogle = async (prisma, req) => {
   console.log('req.body', req.body);    
   const payload = await verifyIdToken(req.body.idToken, req.body.clientId);
 
@@ -50,8 +50,6 @@ module.exports.LoginWithGoogle = async (req, res) => {
   const account_source_name = payload['name'];
   const account_source_picture = payload['picture'];
   
-  const prisma = new PrismaClient();
-
   let user = await getUser(prisma, account_source_type, account_source_id);
   let result;
 
@@ -72,21 +70,10 @@ module.exports.LoginWithGoogle = async (req, res) => {
     result = user;
   }    
 
-  prisma.$disconnect();
   return result;
 };
 
-module.exports.UserLoginHistory = async (json) => {
-  const config = {
-    schema: process.env.MYSQL_DATABASE,
-    password: process.env.MYSQL_PASSWORD,
-    user: process.env.MYSQL_USER,
-    host: process.env.MYSQL_HOST,
-    port: parseInt(process.env.MYSQL_X_PORT),
-  };
-  console.log('config', config);
-  const session = await mysqlx.getSession(config);    
-  console.log('session', session);
+module.exports.UserLoginHistory = async (session, json) => {
 
   const schema = session.getSchema(process.env.MYSQL_DATABASE);
   const exists = await schema.existsInDatabase();
@@ -101,6 +88,5 @@ module.exports.UserLoginHistory = async (json) => {
 
   const result = (await collection.find(`_id == '${addRowId}'`).execute()).fetchOne();
 
-  session.close();
   return result;
 };
