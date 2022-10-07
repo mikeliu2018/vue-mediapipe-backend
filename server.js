@@ -67,6 +67,14 @@ app.delete('/logout', function (request, response) {
   response.send({ result: 'OK', message: 'logout successfully' });  
 });
 
+// Handling non matching request from the client
+app.use(function(request, response, next) {  
+  response.status(404).json({
+    result: 'error',
+    error: 'Not Found'
+  });
+});
+
 //
 // Create an HTTP server.
 //
