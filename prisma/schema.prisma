@@ -35,14 +35,4 @@ model users {
   @@unique([account_source_type, account_source_id], map: "account_source_unique")
 }
 
-model record_user_login_history {
-  doc         Json?
-  id          Bytes @id @map("_id") @db.VarBinary(32)
-  json_schema Json? @map("_json_schema")
-}
 
-model user_login_history {
-  doc         Json?
-  id          Bytes @id @map("_id") @db.VarBinary(32)
-  json_schema Json? @map("_json_schema")
-}

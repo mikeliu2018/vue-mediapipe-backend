@@ -12,6 +12,7 @@ const { PrismaClient } = require('@prisma/client');
 const mysqlx = require('@mysql/xdevapi');
 const { getUser, LoginWithGoogle, UserLoginHistory } = require('./modules/user');
 const { verify } = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 const port = 3000;
@@ -26,6 +27,9 @@ process.on('uncaughtException', err => {
 //
 app.use(express.static('public'));
 app.use(express.json());
+app.use(express.urlencoded({
+  extended: true
+}))
 
 const mysqlxConfig = {
   schema: process.env.MYSQL_DATABASE,
@@ -34,6 +38,36 @@ const mysqlxConfig = {
   host: process.env.MYSQL_HOST,
   port: parseInt(process.env.MYSQL_X_PORT),
 };
+
+app.get('/code/verify', async function (req, res) {
+  console.log('req.query', req.query);
+
+  if (req.query.code) {
+    const clientConfig = {    
+      client_id: process.env.GOOGLE_OAuth2ClientId,
+      client_secret: process.env.GOOGLE_OAuth2ClientSecret,
+      redirect_uri: process.env.GOOGLE_OAuth2RedirectUri
+    }
+  
+    const oAuth2Client = new OAuth2Client(
+      clientConfig.client_id,
+      clientConfig.client_secret,
+      clientConfig.redirect_uri
+    );
+  
+    const getTokenResult = await oAuth2Client.getToken(req.query.code);
+    console.log("getTokenResult", getTokenResult);
+  
+    const searchParams = new URLSearchParams(getTokenResult.tokens);
+    const redirectUri = `electron-login://result/?${searchParams.toString()}`;
+    res.status(302).redirect(redirectUri);
+  } else {
+    const searchParams = new URLSearchParams(req.query);
+    const redirectUri = `electron-login://result/?${searchParams.toString()}`;
+    res.status(302).redirect(redirectUri);
+  }
+
+});
 
 app.post('/login-with-google', async function (req, res) {  
 
@@ -45,8 +79,14 @@ app.post('/login-with-google', async function (req, res) {
   try {
     const user = await LoginWithGoogle(prisma, req);
     console.log('loginWithGoogle result', user);
-    
-    const userLoginHistory = await UserLoginHistory(session, user);
+
+    const objectDate = new Date();
+    const loginHistory = {
+      uuid: user.uuid,
+      created_at: objectDate,
+      updated_at: objectDate
+    }
+    const userLoginHistory = await UserLoginHistory(session, loginHistory);
     console.log('userLoginHistory', userLoginHistory);
 
     res.send({ result: 'OK', message: 'login successfully' });
